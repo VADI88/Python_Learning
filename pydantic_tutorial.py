@@ -18,9 +18,17 @@ from pydantic import (
     conlist,
     Field,
     HttpUrl,
-)
+    model_validator,
+    ValidationError,
+    computed_field,
+TypeAdapter
 
-from typing import Optional, List
+)
+from uuid import uuid4
+from typing import Optional, List, Any
+from decimal import Decimal
+from datetime import datetime
+from dataclasses import dataclass,field
 
 
 class User(BaseModel):
@@ -216,3 +224,145 @@ except ValueError as e:
     print(e)
 
 # Model validators - allowing you to create a model before and after field validation
+
+class Owner(BaseModel):
+    name: str
+    email: EmailStr
+
+    @model_validator(mode='before')
+    @classmethod
+    def check_sensitive_info_omitted(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if 'password' in data:
+                raise ValueError('password should not be included')
+            if 'card_number' in data:
+                raise ValueError('card_number should not be included')
+        return data
+
+    @model_validator(mode='after')
+    def check_name_contains_space(self) -> 'Owner':
+        if ' ' not in self.name:
+            raise ValueError('Owner name must contain a space')
+        return self
+
+
+print(Owner(name="John Doe", email="john.doe@example.com"))
+
+try:
+    Owner(name="JohnDoe", email="john.doe@example.com", password="password123")
+except ValidationError as e:
+    print(e)
+
+
+# Field
+
+class User(BaseModel):
+    name: str = Field(default='John Doe')
+
+user = User()
+print(user)
+
+
+
+
+class User(BaseModel):
+    id: int = Field(default_factory=lambda: uuid4().hex)
+
+user = User()
+print(user)
+
+class User(BaseModel):
+    name: str = Field(..., alias='username')  # if you API and database fields differ - you only need one model
+
+
+user = User(username='johndoe')
+print(user)
+print(user.model_dump(by_alias=True))
+
+
+# More parameters
+
+class User(BaseModel):
+    username: str = Field(..., min_length=3, max_length=10, pattern=r'^\w+$')
+    email: EmailStr = Field(...)
+    age: int = Field(..., gt=0, le=120)
+    height: float = Field(..., gt=0.0)
+    is_active: bool = Field(True)
+    balance: Decimal = Field(..., max_digits=10, decimal_places=2)
+    favorite_numbers: List[int] = Field(..., min_items=1)
+
+user_instance = User(
+    username="john_doe", # will valid if the length of the variable is greater than 3 and less than 10
+    age=30, # will valid if the age is greater than 0 and less than 120
+    height=5.9, # will valid if the height is greater than 0 and less than 120
+    weight=160.5, # will valid if the length of the variable is greater than 0 and less than 120
+    email="john.doe@example.com",  # Check for valid of email address.
+    password="securepassword",
+    balance=9999.99, # will valid if the decimal place is round to 2.
+    favorite_numbers=[1,2,3]
+)
+
+print(user_instance)
+
+# Computed filed
+
+
+
+
+
+class Person(BaseModel):
+    name: str
+    birth_year: int
+
+    @computed_field
+    @property
+    def age(self) -> int:
+        current_year = datetime.now().year
+        return current_year - self.birth_year
+
+
+print(Person(name="John Doe", birth_year=2000).model_dump())
+
+
+class Person(BaseModel):
+    name: str
+    birth_year: int
+
+    @computed_field
+    @property
+    def age(self) -> int:
+        current_year = datetime.now().year
+        return current_year - self.birth_year
+
+    @field_validator('birth_year')
+    @classmethod
+    def validate_age(cls, v: int) -> int:
+        current_year = datetime.now().year
+        if current_year - v < 18:
+            raise ValueError('Person must be 18 years or older')
+        return v
+
+try:
+    print(Person(name="John Doe", birth_year=2006).model_dump())
+except ValidationError as e:
+    print(e)
+
+# You also also use dataclasses and pydantics valiation logic - dataclasses do not provide that out of the box
+
+from dataclasses import dataclass, field
+from pydantic import Field, TypeAdapter
+
+
+@dataclass
+class User:
+    id: int
+    name: str = 'John Doe'
+    age: Optional[int] = field(
+        default=None,
+        metadata=dict(title='The age of the user', description='do not lie!', ge=18),
+    )
+    height: Optional[int] = Field(None, title='The height in cm', ge=50, le=300)
+    friends: List[int] = field(default_factory=lambda: [0])
+
+# Example of using TypeAdapter to get json_schema of the User dataclass
+print(TypeAdapter(User).json_schema())
