@@ -3,6 +3,7 @@
 import polars as pl
 import matplotlib.pyplot as plt
 from pathlib import Path
+import pins
 
 data_folder_path = Path("data")
 
