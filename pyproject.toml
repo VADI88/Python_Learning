@@ -14,7 +14,11 @@ dependencies = [
     "matplotlib (>=3.10.3,<4.0.0)",
     "pyfonts (>=1.0.0,<2.0.0)",
     "drawarrow (>=0.1.0,<0.2.0)",
-    "pydantic[email] (>=2.11.5,<3.0.0)"
+    "pydantic[email] (>=2.11.5,<3.0.0)",
+    "pytest (>=8.3.5,<9.0.0)",
+    "pytest-pretty (>=1.2.0,<2.0.0)",
+    "requests (>=2.32.3,<3.0.0)",
+    "pytest-sugar (>=1.0.0,<2.0.0)"
 ]
 
 
